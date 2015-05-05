@@ -1,0 +1,6 @@
+.settings/
+gen/
+.classpath
+.project
+*.txt
+*.iml
