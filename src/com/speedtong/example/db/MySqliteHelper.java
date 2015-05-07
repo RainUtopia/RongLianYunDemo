@@ -29,7 +29,11 @@ public class MySqliteHelper extends SQLiteOpenHelper {
             C_CHANNEL + " varchar(50) default 'ANDROID'," +
             C_UUID + " varchar(50) default ''," +
             C_PRODUCT + " varchar(50) default 'YTX'," +
-            C_BRAND + " varchar(50))";
+            C_BRAND + " varchar(50)," +
+            C_REGAIN_TIME + " integer default 0," +
+            C_SEND_TIME + " integer," +
+            C_SEND_TIME2 + " datetime)";
+
 
 
     public MySqliteHelper(Context context) {

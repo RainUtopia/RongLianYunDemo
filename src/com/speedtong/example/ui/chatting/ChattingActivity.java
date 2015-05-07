@@ -28,6 +28,7 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityEvent;
 import android.widget.AbsListView;
 import android.widget.ListView;
 import android.widget.Toast;
@@ -38,6 +39,7 @@ import com.speedtong.example.common.view.RefreshableView;
 import com.speedtong.example.core.ECAsyncTask;
 import com.speedtong.example.core.SDKCoreHelper;
 import com.speedtong.example.db.MessageDao;
+import com.speedtong.example.db.MockUtil;
 import com.speedtong.example.storage.ContactSqlManager;
 import com.speedtong.example.storage.ConversationSqlManager;
 import com.speedtong.example.storage.IMessageSqlManager;
@@ -150,6 +152,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 	public static final DateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private MessageDao messageDao;
 	private Random r = new Random();
+	private String sdpath;
 
 
 	
@@ -167,6 +170,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		uuid = tm.getDeviceId();
 		messageDao = MessageDao.getInstance(this);
 		toast = Toast.makeText(this, "", Toast.LENGTH_SHORT);
+		sdpath = Environment.getExternalStorageDirectory().getAbsolutePath();
 
 		// 初始化界面资源
         initView();
@@ -293,8 +297,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 			}
 			
 			@Override
-			public void beforeTextChanged(CharSequence s, int start, int count,
-					int after) {
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 				
 			}
 			
@@ -307,6 +310,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		mChattingFooter.setOnChattingFooterLinstener(mChattingFooterImpl);
 		// 注册聊天面板附加功能（图片、拍照、文件）被点击回调通知
 		mChattingFooter.setOnChattingPanelClickListener(mChattingPanelImpl);
+
 		mChattingAdapter = new ChattingListAdapter(this);
 		mListView.setAdapter(mChattingAdapter);
 	}
@@ -585,8 +589,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 			// 通知列表刷新
 			msg.setId(rowId);
 			notifyIMessageListView(msg);
-		} catch (Exception e) {
-		}
+		} catch (Exception e) { }
 	}
 	
 	/**
@@ -659,37 +662,112 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 	 */
 	@Override
 	public void onMessageReport(ECMessage message) {
-		rmap.clear();
 		Direction d = message.getDirection();
-		if (Direction.SEND.equals(d)) {
-			long now = System.currentTimeMillis();
-			message.getMsgTime();
+		if (!Direction.SEND.equals(d)) {
+			return;
+		}
 
-			rmap.put(MessageDao.C_UUID, uuid);
-			rmap.put(MessageDao.C_BRAND, brand);
-			rmap.put(MessageDao.C_DIRECT, "SEND");
-			rmap.put(MessageDao.C_FUSER, message.getForm());
-			rmap.put(MessageDao.C_TUSER, message.getTo());
-			rmap.put(MessageDao.C_MESSAGE, String.valueOf(message.getBody()));
+
+		long now = System.currentTimeMillis();
+		String oldMsgId = lastSendMsg.get(K_MSG_ID);
+		boolean failed = false;
+
+		// 重发
+		if (oldMsgId != null) {
+			messageDao.updateSuccessTime(oldMsgId, String.valueOf(now), getStringTime(now));
 			if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
-				rmap.put(MessageDao.C_SUCCESS, "FALSE");
+				int retryTimes = messageDao.getRetryTimes(oldMsgId);
+				if (retryTimes >= MessageDao.TOTAL_RESEND_TIMES) {
+					sendOrResend("new");
+				}else{
+					toast.setText("发送失败, 第[" + (retryTimes + 1) + "]次重发");
+					toast.show();
+					messageDao.updateSuccess(oldMsgId, "FALSE");
+					messageDao.updateRetryTimes(oldMsgId);
+					sendOrResend(null);
+				}
+			}else {
+				messageDao.updateMsgIdTimeSuccess(oldMsgId, message.getMsgId(), "TRUE");
+				lastSendMsg.put(K_MSG_ID, null);
+
+				sendOrResend("new");
 			}
-			rmap.put(MessageDao.C_MSG_ID, message.getMsgId());
-			rmap.put(MessageDao.C_MSG_TIME, String.valueOf(now));
-			rmap.put(MessageDao.C_MSG_TIME2, getStringTime(now));
-			rmap.put(MessageDao.C_MSG_TYPE, message.getType().toString());
-
-
-			messageDao.insert(rmap);
-
-			Log.e("消息发送报告", message.getBody() + "," + message.getMsgStatus());
+			return;
 		}
 
-		if (mChattingAdapter != null) {
-			mChattingAdapter.notifyDataSetChanged();
+		rmap.clear();
+		rmap.put(MessageDao.C_UUID, uuid);
+		rmap.put(MessageDao.C_BRAND, brand);
+		rmap.put(MessageDao.C_DIRECT, "SEND");
+		rmap.put(MessageDao.C_FUSER, message.getForm());
+		rmap.put(MessageDao.C_TUSER, message.getTo());
+		rmap.put(MessageDao.C_MESSAGE, String.valueOf(message.describeContents()));
+		if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
+			failed = true;
+			rmap.put(MessageDao.C_SUCCESS, "FALSE");
+			lastSendMsg.put(K_MSG_ID, message.getMsgId());
 		}
+		rmap.put(MessageDao.C_MSG_ID, message.getMsgId());
+		rmap.put(MessageDao.C_MSG_TIME, String.valueOf(sendTime));
+		rmap.put(MessageDao.C_MSG_TIME2, getStringTime(sendTime));
+		rmap.put(MessageDao.C_SEND_TIME, String.valueOf(now));
+		rmap.put(MessageDao.C_SEND_TIME2, getStringTime(now));
+
+		String body = String.valueOf(message.getBody());
+		String msgType = "FILE";
+		if (body.contains(".jpg") || body.contains(".png") || body.contains(".gif")) {
+			msgType = "IMAGE";
+		}else if (body.contains(".amr")) {
+			msgType = "VOICE";
+		}
+		rmap.put(MessageDao.C_MSG_TYPE, msgType);
+		messageDao.insert(rmap);
+
+
+		// ---------------------------------------------------------------------------------------------
+		// 重发
+		if (failed) {
+			sendOrResend(null);
+		}
+		// 发新消息
+		else {
+			sendOrResend("new");
+		}
+		Log.e("消息发送报告", message.getBody() + "," + message.getMsgStatus());
 	}
 
+
+	public void sendOrResend(String newMsg) {
+		if ("new".equals(newMsg)) {
+			mHandler.postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					start(null);
+				}
+			}, 3000);
+		}else{
+			if (lastSendMsg.get(K_TXT) != null) {
+				mHandler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						handleSendTextMessage(lastSendMsg.get(K_TXT));
+					}
+				}, 1000);
+
+			}else{
+				mHandler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						long length = Long.valueOf(lastSendMsg.get(K_LENGTH));
+						String pathName = lastSendMsg.get(K_PATH);
+						handleSendFileAttachMessage(length, pathName);
+					}
+				}, 1000);
+			}
+		}
+
+
+	}
 	/**
 	 * 收到新的Push消息
 	 * TODO
@@ -712,9 +790,9 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 				smap.put(MessageDao.C_FUSER, message.getForm());
 				smap.put(MessageDao.C_TUSER, message.getTo());
 				smap.put(MessageDao.C_MESSAGE, String.valueOf(message.getBody()));
-//				if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
-//					smap.put(MessageDao.C_SUCCESS, "FALSE");
-//				}
+				if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
+					smap.put(MessageDao.C_SUCCESS, "FALSE");
+				}
 				smap.put(MessageDao.C_MSG_ID, message.getMsgId());
 				smap.put(MessageDao.C_MSG_TIME, String.valueOf(now));
 				smap.put(MessageDao.C_MSG_TIME2, getStringTime(now));
@@ -780,8 +858,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 				mToneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, volume);
 
 			} catch (RuntimeException e) {
-				LogUtil.d("Exception caught while creating local tone generator: "
-						+ e);
+				LogUtil.d("Exception caught while creating local tone generator: " + e);
 				mToneGenerator = null;
 			}
 		}
@@ -847,7 +924,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 	}
 	
 	/**
-	 * 消息重发
+	 * TODO 消息重发
 	 * @param msg
 	 * @param position
 	 */
@@ -1254,27 +1331,78 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 
 	// --------------------------------------------------------------------------------------
 	private boolean gooo;
+	boolean start;
 	private Toast toast;
 	public String getStringTime(long millis) {
 		return format.format(new Date(millis));
 	}
 
-	public void start(View view) {
-		toast.setText("开始发送");
-		toast.show();
-		new Thread() {
-			@Override
-			public void run() {
-				while (gooo) {
+	private Map<String, String> lastSendMsg = new HashMap<>();
 
-				}
-			}
-		}.start();
+	public static final String K_MSG_ID = "k_msg_id";
+	public static final String K_TXT = "k_txt";
+	public static final String K_LENGTH = "k_length";
+	public static final String K_PATH = "k_path";
+	public long sendTime;
+
+
+	public void start(View view) {
+		lastSendMsg.clear();
+		if (view != null) {
+			view.setClickable(false);
+			gooo = true;
+		}
+		if (!gooo) {
+			toast.setText("已停卡");
+			toast.show();
+			return;
+		}
+
+
+//		new Thread() {
+//			@Override
+//			public void run() {
+		if (MockUtil.isTimeUp()) {
+			Log.e("Time's up", "----------------------------------------");
+			return;
+		}
+		sendTime = System.currentTimeMillis();
+		int index = MockUtil.getSendType();
+		// 文本
+		if (index == 0) {
+			String txt = MockUtil.txt();
+			handleSendTextMessage(txt);
+			lastSendMsg.put(K_TXT, txt);
+			// 图片
+		} else if (index == 1) {
+			long len = 428318;
+			String path = sdpath + "/yuntongxun/image/image3.png";
+			lastSendMsg.put(K_LENGTH, String.valueOf(len));
+			lastSendMsg.put(K_PATH, path);
+			handleSendFileAttachMessage(len, path);
+			// 声音
+		} else if (index == 2) {
+			long len = 73158;
+			String path = sdpath + "/yuntongxun/voice/voice_91.amr";
+			lastSendMsg.put(K_LENGTH, String.valueOf(len));
+			lastSendMsg.put(K_PATH, path);
+			handleSendFileAttachMessage(len, path);
+			// 文件
+		} else if (index == 3) {
+			long len = 1147016;
+			String path = sdpath + "/yuntongxun/video/video_20.mp4";
+			lastSendMsg.put(K_LENGTH, String.valueOf(len));
+			lastSendMsg.put(K_PATH, path);
+
+			handleSendFileAttachMessage(len, path);
+		}
+//			}
+//		}.start();
 	}
+
+
 
 	public void stop(View view) {
 		gooo = false;
-		toast.setText("已停止");
-		toast.show();
 	}
 }
