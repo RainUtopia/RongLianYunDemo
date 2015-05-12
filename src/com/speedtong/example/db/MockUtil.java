@@ -14,7 +14,7 @@ public class MockUtil {
      * @return
      */
     public static int getSleepTime() {
-        return r.nextInt(80001) + 10000;
+        return r.nextInt(70001) + 20000;
     }
 
     /**

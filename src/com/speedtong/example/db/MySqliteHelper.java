@@ -37,7 +37,7 @@ public class MySqliteHelper extends SQLiteOpenHelper {
 
 
     public MySqliteHelper(Context context) {
-        super(context, Environment.getExternalStorageDirectory().getAbsolutePath()+"/yuntongxun/yuntongxun.db", null, 1);
+        super(context, Environment.getExternalStorageDirectory().getAbsolutePath()+"/yuntongxun/imdata.db", null, 1);
     }
 
 

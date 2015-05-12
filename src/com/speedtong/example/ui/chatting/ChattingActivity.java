@@ -675,6 +675,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		// 重发
 		if (oldMsgId != null) {
 			messageDao.updateSuccessTime(oldMsgId, String.valueOf(now), getStringTime(now));
+			// 重发失败
 			if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
 				int retryTimes = messageDao.getRetryTimes(oldMsgId);
 				if (retryTimes >= MessageDao.TOTAL_RESEND_TIMES) {
@@ -686,6 +687,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 					messageDao.updateRetryTimes(oldMsgId);
 					sendOrResend(null);
 				}
+			// 重发成功
 			}else {
 				messageDao.updateMsgIdTimeSuccess(oldMsgId, message.getMsgId(), "TRUE");
 				lastSendMsg.put(K_MSG_ID, null);
@@ -744,7 +746,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 				public void run() {
 					start(null);
 				}
-			}, 3000);
+			}, MockUtil.getSleepTime());
 		}else{
 			if (lastSendMsg.get(K_TXT) != null) {
 				mHandler.postDelayed(new Runnable() {
@@ -779,6 +781,10 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		}
 
 		for (ECMessage message : msgs) {
+			String userId = CCPAppManager.getClientUser().getUserId();
+			if (!message.getTo().equals(userId)) {
+				continue;
+			}
 			Direction d = message.getDirection();
 			if (d.equals(Direction.RECEIVE)) {
 
@@ -789,7 +795,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 				smap.put(MessageDao.C_DIRECT, "RECEIVE");
 				smap.put(MessageDao.C_FUSER, message.getForm());
 				smap.put(MessageDao.C_TUSER, message.getTo());
-				smap.put(MessageDao.C_MESSAGE, String.valueOf(message.getBody()));
+				smap.put(MessageDao.C_MESSAGE, String.valueOf(message.describeContents()));
 				if (ECMessage.MessageStatus.FAILED.equals(message.getMsgStatus())) {
 					smap.put(MessageDao.C_SUCCESS, "FALSE");
 				}
