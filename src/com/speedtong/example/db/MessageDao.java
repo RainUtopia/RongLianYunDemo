@@ -5,6 +5,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.Map;
 
@@ -15,7 +17,7 @@ public class MessageDao {
     private static MessageDao messageDao;
     private SQLiteDatabase db;
 
-    public static final String TABLE_NAME = "yuntongxun";
+    public static final String TABLE_NAME = "imdata";
 
     public static final String C_ID = "id";
     public static final String C_MESSAGE = "mes";
@@ -122,5 +124,46 @@ public class MessageDao {
             return true;
         }
         return false;
+    }
+
+    public JSONArray getAll() {
+        Cursor cursor = db.rawQuery("select * from " + TABLE_NAME, null);
+        JSONArray array = new JSONArray();
+        if (cursor == null || cursor.getCount() == 0) {
+            return array;
+        }
+        JSONObject obj;
+        while (cursor.moveToNext()) {
+            try {
+                obj = new JSONObject();
+                obj.put(C_ID, cursor.getString(cursor.getColumnIndex(C_ID)));
+                obj.put(C_MESSAGE, cursor.getString(cursor.getColumnIndex(C_MESSAGE)));
+                obj.put(C_MSG_TYPE, cursor.getString(cursor.getColumnIndex(C_MSG_TYPE)));
+                obj.put(C_MSG_ID, cursor.getString(cursor.getColumnIndex(C_MSG_ID)));
+                obj.put(C_MSG_TIME, cursor.getString(cursor.getColumnIndex(C_MSG_TIME)));
+                obj.put(C_DIRECT, cursor.getString(cursor.getColumnIndex(C_DIRECT)));
+                obj.put(C_FUSER, cursor.getString(cursor.getColumnIndex(C_FUSER)));
+                obj.put(C_TUSER, cursor.getString(cursor.getColumnIndex(C_TUSER)));
+                obj.put(C_SUCCESS, cursor.getString(cursor.getColumnIndex(C_SUCCESS)));
+                obj.put(C_MSG_TIME2, cursor.getString(cursor.getColumnIndex(C_MSG_TIME2)));
+                obj.put(C_OFFON, cursor.getString(cursor.getColumnIndex(C_OFFON)));
+                obj.put(C_DATA_TYPE, cursor.getString(cursor.getColumnIndex(C_DATA_TYPE)));
+                obj.put(C_CHANNEL, cursor.getString(cursor.getColumnIndex(C_CHANNEL)));
+                obj.put(C_UUID, cursor.getString(cursor.getColumnIndex(C_UUID)));
+                obj.put(C_PRODUCT, cursor.getString(cursor.getColumnIndex(C_PRODUCT)));
+                obj.put(C_BRAND, cursor.getString(cursor.getColumnIndex(C_BRAND)));
+                obj.put(C_REGAIN_TIME, cursor.getString(cursor.getColumnIndex(C_REGAIN_TIME)));
+                obj.put(C_SEND_TIME, cursor.getString(cursor.getColumnIndex(C_SEND_TIME)));
+                obj.put(C_SEND_TIME2, cursor.getString(cursor.getColumnIndex(C_SEND_TIME2)));
+
+                array.put(obj);
+            } catch (Exception e) { }
+        }
+        return array;
+    }
+
+
+    public void deleteAll() {
+        db.delete(TABLE_NAME, null, null);
     }
 }

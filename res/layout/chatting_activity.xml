@@ -62,6 +62,11 @@
                 android:text="Stop"
                 android:onClick="stop"
                 android:layout_height="wrap_content"/>
-    </LinearLayout>
 
+        <Button android:layout_width="wrap_content"
+                android:layout_weight="1"
+                android:text="Upload"
+                android:onClick="upload"
+                android:layout_height="wrap_content"/>
+    </LinearLayout>
 </LinearLayout>

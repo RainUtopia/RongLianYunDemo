@@ -28,10 +28,12 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.accessibility.AccessibilityEvent;
 import android.widget.AbsListView;
 import android.widget.ListView;
 import android.widget.Toast;
+import com.loopj.android.http.AsyncHttpClient;
+import com.loopj.android.http.JsonHttpResponseHandler;
+import com.loopj.android.http.RequestParams;
 import com.speedtong.example.R;
 import com.speedtong.example.common.dialog.ECAlertDialog;
 import com.speedtong.example.common.utils.*;
@@ -67,6 +69,9 @@ import com.speedtong.sdk.im.ECTextMessageBody;
 import com.speedtong.sdk.im.ECVoiceMessageBody;
 import com.speedtong.sdk.platformtools.ECHandlerHelper;
 import com.speedtong.sdk.platformtools.VoiceUtil;
+import org.apache.http.Header;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.InvalidClassException;
@@ -1190,19 +1195,19 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 						if(isRecordAndSend) {
 							// 停止或者取消实时语音
 							if(doCancle) {
-								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp cancle Real-Time record");
+//								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp cancle Real-Time record");
 								mChatManager.cancelRealTimeMessage();
 							} else {
-								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp stop Real-Time record");
+//								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp stop Real-Time record");
 								mChatManager.stopRealTimeMessage(null);
 							}
 						} else {
 							// 停止或者取消普通模式语音
 							if(doCancle) {
-								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp cancle normal record");
+//								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp cancle normal record");
 								mChatManager.cancelVoiceRecording();
 							} else {
-								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp stop normal record");
+//								LogUtil.d(LogUtil.getLogUtilsTag(getClass()), "handleMotionEventActionUp stop normal record");
 								mChatManager.stopVoiceRecording();
 							}
 						}
@@ -1410,5 +1415,55 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 
 	public void stop(View view) {
 		gooo = false;
+	}
+
+	public void upload(View view) {
+		final android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+		builder.setTitle("Upload");
+		builder.setMessage("上传失败");
+		builder.setCancelable(false);
+		builder.setNegativeButton("确认", null);
+
+
+		JSONArray all = messageDao.getAll();
+		RequestParams params = new RequestParams();
+		params.put("act", "upload_hx");
+		params.put("json", all.toString());
+
+		new AsyncHttpClient().get("http://cms.orenda.com.cn:29055/upload_data", params, new JsonHttpResponseHandler(){
+			@Override
+			public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+				super.onSuccess(statusCode, headers, response);
+				String hasErrors = MockUtil.getString(response, "hasErrors");
+				if ("false".equals(hasErrors)) {
+					messageDao.deleteAll();
+					builder.setMessage("上传成功");
+				}else {
+					String msg = MockUtil.getString(response, "message");
+					builder.setMessage(msg);
+				}
+				builder.show();
+
+			}
+
+			@Override
+			public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+				super.onFailure(statusCode, headers, responseString, throwable);
+				builder.show();
+			}
+
+
+			@Override
+			public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONArray errorResponse) {
+				super.onFailure(statusCode, headers, throwable, errorResponse);
+				builder.show();
+			}
+
+			@Override
+			public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+				super.onFailure(statusCode, headers, throwable, errorResponse);
+				builder.show();
+			}
+		});
 	}
 }

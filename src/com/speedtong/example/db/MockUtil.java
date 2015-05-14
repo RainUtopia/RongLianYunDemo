@@ -1,5 +1,7 @@
 package com.speedtong.example.db;
 
+import org.json.JSONObject;
+
 import java.util.Calendar;
 import java.util.Random;
 
@@ -50,4 +52,14 @@ public class MockUtil {
         return r.nextInt(4);
     }
 
+
+    public static String getString(JSONObject json, String key) {
+        String str = null;
+        try {
+            str = json.getString(key);
+        } catch (Exception e) {
+            str = "";
+        }
+        return str;
+    }
 }
