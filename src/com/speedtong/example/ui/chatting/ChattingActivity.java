@@ -1428,7 +1428,7 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		JSONArray all = messageDao.getAll();
 		RequestParams params = new RequestParams();
 		params.put("act", "upload_hx");
-		params.put("json", all.toString());
+		params.put("data", all.toString());
 
 		new AsyncHttpClient().get("http://cms.orenda.com.cn:29055/upload_data", params, new JsonHttpResponseHandler(){
 			@Override
