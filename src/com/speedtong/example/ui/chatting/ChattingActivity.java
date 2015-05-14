@@ -29,6 +29,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.AbsListView;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 import com.loopj.android.http.AsyncHttpClient;
@@ -1418,6 +1419,14 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 	}
 
 	public void upload(View view) {
+		JSONArray all = messageDao.getAll();
+		if (all.length() == 0) {
+			Toast.makeText(this, "无数据", Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+
+		// 提示框
 		final android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
 		builder.setTitle("Upload");
 		builder.setMessage("上传失败");
@@ -1425,44 +1434,62 @@ public class ChattingActivity extends ECSuperActivity implements View.OnClickLis
 		builder.setNegativeButton("确认", null);
 
 
-		JSONArray all = messageDao.getAll();
-		RequestParams params = new RequestParams();
-		params.put("act", "upload_hx");
-		params.put("data", all.toString());
+		// 按钮文字
+		final Button btn = (Button)view;
+		btn.setText("uploading ...");
+		btn.setClickable(false);
 
-		new AsyncHttpClient().get("http://cms.orenda.com.cn:29055/upload_data", params, new JsonHttpResponseHandler(){
+
+		RequestParams params = new RequestParams();
+		params.put("act", "upload_hxs");
+		params.put("data", all.toString());
+		Log.e("jsondata", all.toString());
+
+		new AsyncHttpClient().post("http://cms.orenda.com.cn:29055/upload_data", params, new JsonHttpResponseHandler() {
 			@Override
 			public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
 				super.onSuccess(statusCode, headers, response);
 				String hasErrors = MockUtil.getString(response, "hasErrors");
 				if ("false".equals(hasErrors)) {
-					messageDao.deleteAll();
 					builder.setMessage("上传成功");
-				}else {
+					messageDao.deleteAll();
+				} else {
 					String msg = MockUtil.getString(response, "message");
+					Log.e("upload.hasError=true", msg);
 					builder.setMessage(msg);
 				}
-				builder.show();
 
+				btn.setText("UPLOAD");
+				btn.setClickable(true);
+				builder.show();
 			}
 
 			@Override
 			public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
 				super.onFailure(statusCode, headers, responseString, throwable);
+				Log.e("onFailure1", String.valueOf(responseString) + "|" + throwable);
 				builder.show();
+				btn.setText("UPLOAD");
+				btn.setClickable(true);
 			}
 
 
 			@Override
 			public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONArray errorResponse) {
 				super.onFailure(statusCode, headers, throwable, errorResponse);
+				Log.e("onFailure2", String.valueOf(errorResponse) + "|" + throwable);
 				builder.show();
+				btn.setText("UPLOAD");
+				btn.setClickable(true);
 			}
 
 			@Override
 			public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
 				super.onFailure(statusCode, headers, throwable, errorResponse);
+				Log.e("onFailure3", String.valueOf(errorResponse) + "|" + throwable);
 				builder.show();
+				btn.setText("UPLOAD");
+				btn.setClickable(true);
 			}
 		});
 	}

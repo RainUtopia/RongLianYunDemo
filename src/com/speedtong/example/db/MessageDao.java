@@ -159,6 +159,7 @@ public class MessageDao {
                 array.put(obj);
             } catch (Exception e) { }
         }
+        cursor.close();
         return array;
     }
 
